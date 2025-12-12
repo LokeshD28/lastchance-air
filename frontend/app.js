@@ -1,6 +1,6 @@
 // frontend/app.js
 
-const API_BASE = "http://localhost:4000"; // change to Render URL when hosting
+const API_BASE = "https://lastchance-air.onrender.com"; // change to Render URL when hosting
 
 // ----- DOM ELEMENTS -----
 const authView = document.getElementById("authView");
@@ -228,9 +228,16 @@ async function loadDeals() {
 // ----- SEARCH -----
 searchForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const from = fromInput.value.trim();
-  const to = toInput.value.trim();
+
+  const extractCode = (val) => {
+    const m = val.match(/\(([A-Z]{3})\)$/);
+    return m ? m[1] : val.toUpperCase();
+  };
+
+  const from = extractCode(fromInput.value.trim());
+  const to = extractCode(toInput.value.trim());
   const date = dateInput.value;
+
   if (!from || !to || !date) return;
 
   try {
