@@ -11,13 +11,23 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.get("/", (req, res) => {
-  res.send("LastChance Air backend is running ✅");
-});
+
 
 app.use(cors());
 app.use(express.json());
 
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, "../frontend")));
+
+// Home page -> frontend
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/index.html"));
+});
+
+// Optional: health check endpoint
+app.get("/health", (req, res) => {
+  res.send("LastChance Air backend is running ✅");
+});
 // Serve frontend files
 app.use(express.static(path.join(__dirname, "../frontend")));
 
