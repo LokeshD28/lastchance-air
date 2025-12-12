@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LastChance Air – Last-Minute Flight Deals</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="logo-wrap">
+        <div class="logo-icon">✈️</div>
+        <div class="logo-text">
+          LastChance <span>Air</span>
+        </div>
+      </div>
+      <nav class="nav" id="appNav" style="display: none">
+        <button data-view="search" class="nav-btn" type="button">
+          Deals &amp; Search
+        </button>
+        <button data-view="bookings" class="nav-btn" type="button">
+          My Bookings
+        </button>
+        <button id="logoutBtn" class="nav-btn nav-logout" type="button">
+          Logout
+        </button>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Catch last-minute seats before they’re gone.</h1>
+        <p>
+          LastChance Air scans U.S. routes for flights in the next few days
+          where seats are still empty and airlines drop prices.
+        </p>
+        <ul class="hero-points">
+          <li>Smart ranking of best discounts</li>
+          <li>Search by city or airport</li>
+          <li>Seat selection &amp; extras at checkout</li>
+        </ul>
+      </div>
+      <div class="hero-image">
+        <img
+          src="https://images.pexels.com/photos/912050/pexels-photo-912050.jpeg?auto=compress&cs=tinysrgb&w=1200"
+          alt="Airplane"
+        />
+      </div>
+    </section>
+
+    <main>
+      <!-- AUTH -->
+      <section id="authView" class="card auth-card">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-auth="login" type="button">
+            Login
+          </button>
+          <button class="auth-tab" data-auth="signup" type="button">
+            Sign Up
+          </button>
+          <button class="auth-tab" data-auth="reset" type="button">
+            Reset Password
+          </button>
+        </div>
+
+        <div id="authLogin" class="auth-panel active">
+          <h2>Welcome back</h2>
+          <p class="subtext">
+            Log in to see your saved bookings and last-minute deals.
+          </p>
+          <form id="loginForm">
+            <label>Email</label>
+            <input type="email" id="loginEmail" required />
+            <label>Password</label>
+            <input type="password" id="loginPassword" required />
+            <button type="submit" class="btn-primary full-width">Login</button>
+          </form>
+          <p id="loginError" class="error-text"></p>
+        </div>
+
+        <div id="authSignup" class="auth-panel">
+          <h2>Create an account</h2>
+          <p class="subtext">
+            Keep track of your last-minute flight bookings in one place.
+          </p>
+          <form id="signupForm">
+            <label>Email</label>
+            <input type="email" id="signupEmail" required />
+            <label>Password</label>
+            <input type="password" id="signupPassword" required />
+            <button type="submit" class="btn-primary full-width">
+              Sign Up
+            </button>
+          </form>
+          <p id="signupError" class="error-text"></p>
+        </div>
+
+        <div id="authReset" class="auth-panel">
+          <h2>Reset password</h2>
+          <p class="subtext">
+            Enter your email and we’ll send a reset link (demo).
+          </p>
+          <form id="resetForm">
+            <label>Email</label>
+            <input type="email" id="resetEmail" required />
+            <button type="submit" class="btn-primary full-width">
+              Send reset link
+            </button>
+          </form>
+          <p id="resetMsg" class="info-text"></p>
+        </div>
+      </section>
+
+      <!-- APP -->
+      <section id="appView" style="display: none">
+        <!-- SEARCH PAGE -->
+        <section id="searchView">
+          <div class="card search-card">
+            <h2>Search last-minute flights</h2>
+            <p class="subtext">
+              Choose a route and a date within the next 5 days to see best
+              discounted seats.
+            </p>
+            <form id="searchForm" class="search-form">
+              <div class="field">
+                <label>From</label>
+                <input
+                  id="fromInput"
+                  list="cityOptions"
+                  placeholder="City or airport (e.g. Los Angeles (LAX))"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label>To</label>
+                <input
+                  id="toInput"
+                  list="cityOptions"
+                  placeholder="City or airport (e.g. New York (JFK))"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label>Departure date</label>
+                <input type="date" id="dateInput" required />
+              </div>
+              <div class="field">
+                <label>Cabin class</label>
+                <select id="cabinClassSelect">
+                  <option value="economy">Economy</option>
+                  <option value="business">Business</option>
+                  <option value="first">First</option>
+                </select>
+              </div>
+              <div class="field field-search-btn">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn-primary full-width">
+                  🔍 Search flights
+                </button>
+              </div>
+            </form>
+            <datalist id="cityOptions"></datalist>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <h3>Top last-minute deals</h3>
+              <p class="subtext">
+                Flights in the next 3 days with the strongest discount + time
+                pressure.
+              </p>
+              <div id="dealsList" class="grid"></div>
+            </div>
+
+            <div class="card">
+              <h3>Search results</h3>
+              <div id="resultsList" class="grid"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BOOKINGS PAGE -->
+        <section id="bookingsView" style="display: none">
+          <div class="card">
+            <h2>My bookings</h2>
+            <p class="subtext">
+              View &amp; cancel your existing LastChance Air bookings.
+            </p>
+            <div id="bookingsList"></div>
+          </div>
+        </section>
+
+        <!-- BOOKING PAGE: seat + extras + passenger -->
+        <section id="bookingView" style="display: none">
+          <div class="card">
+            <button id="backToSearch" class="link-btn" type="button">
+              ← Back to search
+            </button>
+            <h2>Choose your seat &amp; extras</h2>
+            <div id="selectedFlightSummary" class="booking-summary"></div>
+
+            <div class="seat-layout">
+              <div class="seat-legend">
+                <span class="seat seat-standard"></span> Standard seat
+                <span class="seat seat-extra"></span> Extra-legroom (+$40–$80)
+                <span class="seat seat-selected"></span> Selected
+              </div>
+              <div id="seatMap" class="seat-map"></div>
+            </div>
+
+            <form id="bookingForm" class="booking-form">
+              <h3>Passenger details</h3>
+              <div class="field">
+                <label>Passenger name</label>
+                <input type="text" id="passengerName" required />
+              </div>
+              <div class="field">
+                <label>Passenger email</label>
+                <input type="email" id="passengerEmail" required />
+              </div>
+              <div class="field">
+                <label>Passenger age</label>
+                <input
+                  type="number"
+                  id="passengerAge"
+                  min="0"
+                  max="120"
+                  required
+                />
+              </div>
+
+              <h3>Meals &amp; drinks</h3>
+              <div class="field">
+                <label>Meal option</label>
+                <select id="mealSelect">
+                  <option value="standard">Standard meal (included)</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="kosher">Kosher</option>
+                  <option value="no-meal">No meal</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Drink</label>
+                <select id="drinkSelect">
+                  <option value="soft-drink">Soft drink</option>
+                  <option value="coffee">Coffee</option>
+                  <option value="tea">Tea</option>
+                  <option value="wine">Wine (Business/First)</option>
+                  <option value="champagne">Champagne (First)</option>
+                </select>
+              </div>
+
+              <div class="booking-price-row">
+                <div>
+                  <div class="price-label">Total (with seat &amp; extras)</div>
+                  <div id="priceDisplay" class="price-value">$0.00</div>
+                </div>
+                <button type="submit" class="btn-primary">
+                  ✅ Confirm booking
+                </button>
+              </div>
+            </form>
+
+            <p id="bookingMsg" class="info-text"></p>
+          </div>
+        </section>
+
+        <!-- CONFIRMATION PAGE -->
+        <section id="confirmationView" style="display: none">
+          <div class="card">
+            <h2>Booking confirmed 🎉</h2>
+            <p id="confirmMessage" class="subtext"></p>
+
+            <div id="confirmDetails" class="booking-summary"></div>
+
+            <button id="confirmBackHome" class="btn-primary" type="button">
+              Back to deals
+            </button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      LastChance Air – demo app with mock last-minute data (Expedia / Skyscanner
+      inspired UI).
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
