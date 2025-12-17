@@ -5,38 +5,101 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// ------------------ RESEND EMAIL SETUP ------------------
+const { Resend } = require("resend");
 
+// Render ENV vars you must set:
+// RESEND_API_KEY
+// EMAIL_FROM   (example: "LastChance Air <onboarding@resend.dev>")
+// FRONTEND_BASE_URL (example: "https://lastchanceair.netlify.app")
 
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const EMAIL_FROM = process.env.EMAIL_FROM || "onboarding@resend.dev";
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+
+async function sendEmail(to, subject, html) {
+  if (!resend) {
+    console.log("Resend not configured (missing RESEND_API_KEY)");
+    return { ok: false };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to,
+      subject,
+      html
+    });
+
+    if (error) {
+      console.error("Resend error:", error);
+      return { ok: false, error };
+    }
+
+    console.log("Email sent:", data?.id);
+    return { ok: true, data };
+  } catch (err) {
+    console.error("Resend exception:", err);
+    return { ok: false, error: err };
+  }
+}
+
+async function sendBookingEmail(to, booking) {
+  if (!to) return;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height:1.5">
+      <h2>Booking Confirmed ✈️</h2>
+      <p>Your LastChance Air booking is confirmed.</p>
+      <hr/>
+      <p><strong>Reference:</strong> ${booking.bookingRef}</p>
+      <p><strong>Passenger:</strong> ${booking.passengerName} ${
+        booking.passengerAge ? `(Age: ${booking.passengerAge})` : ""
+      }</p>
+      <p><strong>Cabin:</strong> ${booking.cabinClass}</p>
+      <p><strong>Seat:</strong> ${booking.seat || "N/A"}</p>
+      <p><strong>Meal:</strong> ${booking.meal || "Standard"}</p>
+      <p><strong>Drink:</strong> ${booking.drink || "Soft drink"}</p>
+      <p><strong>Total Paid:</strong> $${Number(booking.totalPrice || 0).toFixed(2)}</p>
+      <p><strong>Status:</strong> ${booking.status}</p>
+      <hr/>
+      <p>Thank you for using <b>LastChance Air</b>.</p>
+    </div>
+  `;
+
+  await sendEmail(to, `Your LastChance Air booking ${booking.bookingRef}`, html);
+}
+
+// ------------------ MIDDLEWARE ------------------
 app.use(cors());
 app.use(express.json());
 
-// Serve frontend static files
+// Serve frontend static files (local dev only)
 app.use(express.static(path.join(__dirname, "../frontend")));
 
-// Home page -> frontend
+// Home page -> frontend (local dev only)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-// Optional: health check endpoint
+// Health check
 app.get("/health", (req, res) => {
   res.send("LastChance Air backend is running ✅");
 });
-// Serve frontend files
-app.use(express.static(path.join(__dirname, "../frontend")));
 
-// ============= SQLITE DATABASE =============
+// ------------------ SQLITE DATABASE ------------------
 const dbPath = path.join(__dirname, "database.db");
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
-  // users table
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +109,6 @@ db.serialize(() => {
     )
   `);
 
-  // bookings table
   db.run(`
     CREATE TABLE IF NOT EXISTS bookings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +130,7 @@ db.serialize(() => {
   `);
 });
 
-// ============= MOCK FLIGHT DATA =============
+// ------------------ MOCK FLIGHT DATA ------------------
 const CITIES = [
   { city: "Los Angeles", code: "LAX" },
   { city: "San Francisco", code: "SFO" },
@@ -108,7 +170,6 @@ function generateFlights() {
   const today = new Date();
   let idCounter = 1;
 
-  // generate flights for next 5 days (last-minute)
   for (let dayOffset = 0; dayOffset <= 5; dayOffset++) {
     const date = new Date(today);
     date.setDate(date.getDate() + dayOffset);
@@ -126,7 +187,7 @@ function generateFlights() {
           const basePrice = randomInt(90, 480);
 
           let discountPercent = randomInt(10, 35);
-          if (dayOffset <= 1) discountPercent += 10; // more discount very close to departure
+          if (dayOffset <= 1) discountPercent += 10;
 
           flights.push({
             id: idCounter++,
@@ -169,57 +230,7 @@ function dealScore(flight) {
   return discount * 2 + urgencyScore;
 }
 
-// ============= EMAIL (NODEMAILER) =============
-let transporter = null;
-
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-  console.log("Email transporter configured.");
-} else {
-  console.log("Email transporter NOT configured (missing EMAIL_USER / EMAIL_PASS).");
-}
-
-function sendBookingEmail(to, booking) {
-  if (!transporter || !to) {
-    console.log("Email skipped (no transporter or recipient).");
-    return;
-  }
-
-  console.log("Attempting to send email to:", to);
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to,
-    subject: `Your LastChance Air booking ${booking.bookingRef}`,
-    text:
-      `Your booking is confirmed.\n\n` +
-      `Reference: ${booking.bookingRef}\n` +
-      `Passenger: ${booking.passengerName} (Age: ${booking.passengerAge ?? "N/A"})\n` +
-      `Cabin: ${booking.cabinClass}\n` +
-      `Seat: ${booking.seat || "N/A"}\n` +
-      `Meal: ${booking.meal || "Standard"}\n` +
-      `Drink: ${booking.drink || "Soft drink"}\n` +
-      `Total: $${booking.totalPrice.toFixed(2)}\n\n` +
-      `Status: ${booking.status}\n\n` +
-      `Thank you for using LastChance Air.`
-  };
-
-  transporter.sendMail(mailOptions, (err, info) => {
-    if (err) {
-      console.error("Email error:", err.message);
-    } else {
-      console.log("Email sent:", info.response);
-    }
-  });
-}
-
-// ============= AUTH ROUTES =============
+// ------------------ AUTH ROUTES ------------------
 app.post("/api/signup", (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)
@@ -246,6 +257,7 @@ app.post("/api/signup", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
+
   db.get("SELECT * FROM users WHERE email = ?", [email], (err, row) => {
     if (err) {
       console.error("Login DB error:", err);
@@ -260,15 +272,30 @@ app.post("/api/login", (req, res) => {
   });
 });
 
-app.post("/api/request-password-reset", (req, res) => {
-  // demo only
+// ✅ Password reset email (demo)
+app.post("/api/request-password-reset", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  // demo token (in real life store it in DB)
+  const resetToken = Math.random().toString(36).slice(2);
+  const resetLink = `${FRONTEND_BASE_URL}/reset?token=${resetToken}`;
+
+  await sendEmail(
+    email,
+    "Reset your LastChance Air password",
+    `<p>Click below to reset your password:</p>
+     <p><a href="${resetLink}">${resetLink}</a></p>
+     <p><small>(Demo link – token not stored in DB)</small></p>`
+  );
+
   res.json({
     success: true,
-    message: "Password reset email (mock) has been sent if the user exists."
+    message: "If the email exists, a reset link has been sent."
   });
 });
 
-// ============= FLIGHTS ROUTES =============
+// ------------------ FLIGHTS ROUTES ------------------
 app.get("/api/cities", (req, res) => {
   res.json(CITIES);
 });
@@ -300,14 +327,13 @@ app.get("/api/flights", (req, res) => {
   const today = new Date();
   const diffDays = (selected - today) / (1000 * 60 * 60 * 24);
 
-  // only allow next 5 days
   if (diffDays > 5) return res.json([]);
 
   const list = FLIGHTS.filter((f) => {
     if (f.originCode !== codeFrom || f.destinationCode !== codeTo) return false;
     const fd = new Date(f.departureDate);
     const delta = Math.abs((fd - selected) / (1000 * 60 * 60 * 24));
-    return delta <= 1.01; // +/- 1 day
+    return delta <= 1.01;
   }).sort((a, b) => dealScore(b) - dealScore(a));
 
   res.json(list);
@@ -320,7 +346,7 @@ app.get("/api/flights/:id", (req, res) => {
   res.json(flight);
 });
 
-// ============= BOOKINGS ROUTES =============
+// ------------------ BOOKINGS ROUTES ------------------
 function makeBookingRef() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
@@ -373,7 +399,7 @@ app.post("/api/bookings", (req, res) => {
       "confirmed",
       createdAt
     ],
-    function (err) {
+    async function (err) {
       if (err) {
         console.error("DB booking error:", err);
         return res.status(500).json({ error: "Database error" });
@@ -396,8 +422,8 @@ app.post("/api/bookings", (req, res) => {
 
       console.log("Booking created:", bookingPayload);
 
-      // send email, but don't fail booking if email fails
-      sendBookingEmail(passengerEmail, bookingPayload);
+      // ✅ send booking confirmation via Resend (does not block)
+      sendBookingEmail(passengerEmail, bookingPayload).catch(console.error);
 
       res.json({
         success: true,
@@ -409,6 +435,7 @@ app.post("/api/bookings", (req, res) => {
 
 app.get("/api/bookings/user/:userId", (req, res) => {
   const userId = req.params.userId;
+
   db.all(
     "SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC",
     [userId],
@@ -440,6 +467,7 @@ app.get("/api/bookings/user/:userId", (req, res) => {
 
 app.post("/api/bookings/:id/cancel", (req, res) => {
   const id = req.params.id;
+
   db.run(
     "UPDATE bookings SET status = 'cancelled' WHERE id = ?",
     [id],
@@ -461,7 +489,10 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-// ============= START SERVER =============
+// ------------------ START SERVER ------------------
 app.listen(PORT, () => {
   console.log(`Backend listening on port ${PORT}`);
+  console.log("Resend enabled:", !!process.env.RESEND_API_KEY);
+  console.log("EMAIL_FROM:", EMAIL_FROM);
+  console.log("FRONTEND_BASE_URL:", FRONTEND_BASE_URL);
 });
